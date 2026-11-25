@@ -1,0 +1,24 @@
+name: Relationship core checks
+on:
+  push:
+    paths:
+      - 'src/**/bonds/**'
+      - '.github/workflows/core-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile and test relationship core
+        run: |
+          mkdir -p out
+          javac -d out src/main/java/dev/rean/abyss/bonds/Bond.java src/test/java/dev/rean/abyss/bonds/BondSelfTest.java
+          java -cp out dev.rean.abyss.bonds.BondSelfTest
