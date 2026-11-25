@@ -1,0 +1,47 @@
+name: Abyss bulk mod resolution
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/pack-expansion.yml'
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Resolve compatible releases and required dependencies
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, urllib.request, urllib.parse, time
+          slugs = """sophisticated-backpacks sophisticated-storage sophisticated-core artifacts relics apotheosis apothic-attributes placebo aether deeperdarker the-bumblezone better-combat playeranimator lightmans-currency supplementaries moonlight sodium iris entityculling immediatelyfast dynamic-fps badoptimizations moreculling modernfix lithium ferrite-core cloth-config architectury-api geckolib curios jei emi jade appleskin clumps waystones balm terralith tectonic incendium nullscape yungs-api yungs-better-dungeons yungs-better-mineshafts yungs-better-strongholds yungs-better-desert-temples yungs-better-jungle-temples yungs-better-ocean-monuments yungs-better-nether-fortresses yungs-better-witch-huts yungs-bridges yungs-extras towns-and-towers choice-theorems-overhauled-village explorify dungeons-and-taverns repurposed-structures structure-compass travelersbackpack lootr trashslot pickup-notifier inventory-profiles-next mouse-tweaks controlling searchables polylib puzzles-lib bookshelf resourceful-lib resourceful-config collective framework athena chipped rechiseled fusion handcrafted comfortables comforts decorative-blocks another-furniture connected-glass framedblocks rechiseled-create createaddition create-deco create-steam-n-rails create-enchantment-industry create-dragons-plus create-ultimate-factory immersive-engineering pneumaticcraft-repressurized industrial-foregoing titanium powah flux-networks pipez functional-storage storage-drawers enderstorage trash-cans building-gadgets building-wands construction-wand sophisticated-storage-in-motion cooking-for-blockheads farming-for-blockheads farmers-delight delights-of-the-dark oceans-delight ends-delight nether-s-delight rustic-delight extra-delight farmers-respite aquaculture croptopia botany-pots botany-trees mystical-agriculture mystical-agradditions cucumber right-click-harvest lets-do-vinery lets-do-bakery lets-do-brewery lets-do-meadow lets-do-herbalbrews lets-do-farm-and-charm naturalist alexs-mobs critters-and-companions friends-and-foes wildlife better-animals-plus dragon-mounts-legacy ice-and-fire dragons-survival mythic-mounts guard-villagers easy-villagers more-villagers villager-names villager-trading-post trading-post goblin-traders small-ships immersive-aircraft simply-swords tetra silent-gear silent-lib epic-knights simply-bows spell-engine spell-power-attributes ars-elemental ars-additions ars-creo ars-ocultas occultism forbidden-arcanus botania nature-aura blood-magic malum hexerei irons-spells-n-spellbooks irons-ice-and-fire spellbooks-recrafted passive-skill-tree puffish-skills puffish-attributes better-advancements ftb-quests ftb-library ftb-teams ftb-chunks ftb-essentials kubejs rhino lootjs open-parties-and-claims xaeros-minimap xaeros-world-map journeymap sound-physics-remastered ambient-sounds creativecore presence-footsteps fallingtree better-third-person animation-overhaul not-enough-animations first-person-model chat-heads skin-layers-3d legendary-tooltips prism enchantment-descriptions configured catalogue polymorph toast-control carry-on natures-compass explorers-compass gravestone-mod corpse patchouli project-expansion projecte-integration projecte""".split()
+          done, failed = {}, {}
+          query = urllib.parse.urlencode({'loaders':json.dumps(['neoforge']), 'game_versions':json.dumps(['1.21.1'])})
+          def get(path):
+              req=urllib.request.Request('https://api.modrinth.com/v2/'+path, headers={'User-Agent':'AbyssPackBuilder/0.1 (github.com/rinvdbgaming-oss/abyss)'})
+              with urllib.request.urlopen(req,timeout=15) as r: return json.load(r)
+          def resolve(slug):
+              if slug in done or slug in failed: return
+              try:
+                  versions=get('project/'+slug+'/version?'+query)
+                  if not versions: raise ValueError('No matching release')
+                  v=next((x for x in versions if x['version_type']=='release'),versions[0])
+                  done[slug]=v
+                  for d in v['dependencies']:
+                      if d['dependency_type']=='required' and d.get('project_id'): resolve(d['project_id'])
+              except Exception as e: failed[slug]=str(e)
+              time.sleep(.12)
+          for s in slugs: resolve(s)
+          unique={v['project_id']:v for v in done.values()}
+          with open('resolved-candidates.json','w') as f: json.dump(list(unique.values()),f,indent=2)
+          with open('unresolved.json','w') as f: json.dump(failed,f,indent=2)
+          print('Unique matching candidate projects:',len(unique),'Unresolved:',len(failed))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abyss-resolved-candidates
+          path: |
+            resolved-candidates.json
+            unresolved.json
